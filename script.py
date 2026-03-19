@@ -4,15 +4,20 @@ import os
 import io
 import re
 import json
+import ntpath
+import posixpath
 import base64
 import System
 import traceback
 
 from pyrevit import forms, script, revit, DB
+from System.Windows import Window, WindowStartupLocation
+from System.Windows.Media import SolidColorBrush, Color
 
 # Load WebView2
 clr.AddReference("Microsoft.Web.WebView2.Wpf")
 clr.AddReference("Microsoft.Web.WebView2.Core")
+from Microsoft.Web.WebView2.Wpf import WebView2
 
 try:
     from urllib import unquote
@@ -21,7 +26,7 @@ except ImportError:
 
 try:
     text_type = unicode
-    binary_types = (str, bytearray)
+    binary_types = (bytearray,)
 except NameError:
     text_type = str
     binary_types = (bytes, bytearray)
@@ -65,8 +70,7 @@ class ClashItem(object):
             self.DisplayId = self.Item1_ID
 
     def to_view_model(self, html_folder):
-        rel_path = normalize_path(unquote(to_text(self.ImageRelPath)))
-        full_img_path = os.path.normpath(os.path.join(html_folder, rel_path)) if rel_path else u""
+        full_img_path = resolve_image_reference(html_folder, self.ImageRelPath)
         return {
             "rowKey": to_text(self.RowKey),
             "name": to_text(self.Name),
@@ -77,10 +81,18 @@ class ClashItem(object):
         }
 
 
-class ModernWebView(forms.WPFWindow):
+class ModernWebView(Window):
     def __init__(self):
-        xaml_file = script.get_bundle_file("ui_webview.xaml")
-        forms.WPFWindow.__init__(self, xaml_file)
+        Window.__init__(self)
+
+        self.Title = "Modern Clash Viewer"
+        self.Width = 1000
+        self.Height = 700
+        self.WindowStartupLocation = WindowStartupLocation.CenterScreen
+        self.Background = SolidColorBrush(Color.FromRgb(30, 30, 30))
+
+        self.webView = WebView2()
+        self.Content = self.webView
 
         self.clash_data = []
         self.clash_lookup = {}
@@ -255,17 +267,26 @@ class ModernWebView(forms.WPFWindow):
 
     def LoadImageBase64(self, img_path):
         try:
-            img_path = to_text(img_path)
-            if not img_path or not os.path.exists(img_path):
+            img_path = to_text(img_path).strip()
+            if not img_path:
                 self.call_js("showBase64Image", "")
                 return
 
-            with io.open(img_path, "rb") as image_file:
+            if img_path.startswith("data:"):
+                self.call_js("showBase64Image", img_path)
+                return
+
+            resolved_img_path = resolve_image_reference(self.html_folder, img_path)
+            if not resolved_img_path or not os.path.exists(resolved_img_path):
+                self.call_js("showBase64Image", "")
+                return
+
+            with io.open(resolved_img_path, "rb") as image_file:
                 encoded = base64.b64encode(image_file.read())
                 if not isinstance(encoded, text_type):
                     encoded = encoded.decode("utf-8")
 
-            ext = img_path.lower().rsplit(".", 1)[-1] if "." in img_path else ""
+            ext = resolved_img_path.lower().rsplit(".", 1)[-1] if "." in resolved_img_path else ""
             mime = "image/jpeg"
             if ext == "png":
                 mime = "image/png"
@@ -498,15 +519,50 @@ class ModernWebView(forms.WPFWindow):
 def to_text(value):
     if value is None:
         return u""
-    if isinstance(value, binary_types):
-        return value.decode("utf-8", "ignore")
     if isinstance(value, text_type):
         return value
-    return text_type(value)
+    if isinstance(value, System.String):
+        return text_type(value)
+    if isinstance(value, binary_types):
+        try:
+            return bytes(value).decode("utf-8", "ignore")
+        except Exception:
+            return text_type(value)
+    try:
+        return value.decode("utf-8", "ignore")
+    except Exception:
+        return text_type(value)
 
 
 def normalize_path(path_value):
     return to_text(path_value).replace("/", os.sep).replace("\\", os.sep).replace(u"\xa0", u" ").strip()
+
+
+def resolve_image_reference(base_folder, image_ref):
+    image_ref = to_text(image_ref).strip().strip("\"'")
+    if not image_ref:
+        return u""
+
+    image_ref = image_ref.replace("&amp;", "&")
+    image_ref = unquote(image_ref)
+
+    if image_ref.startswith("data:"):
+        return image_ref
+
+    if image_ref.lower().startswith("file:///"):
+        image_ref = image_ref[8:]
+    elif image_ref.lower().startswith("file://"):
+        image_ref = image_ref[7:]
+
+    if re.match(r'^[a-zA-Z]:[\\/]', image_ref) or image_ref.startswith('\\'):
+        return os.path.normpath(image_ref.replace('/', os.sep))
+
+    normalized_rel = posixpath.normpath(image_ref.replace('\\', '/'))
+    normalized_rel = normalized_rel.lstrip('/')
+    if normalized_rel and normalized_rel != '.':
+        return os.path.normpath(os.path.join(base_folder, normalized_rel.replace('/', os.sep)))
+
+    return os.path.normpath(os.path.join(base_folder, ntpath.basename(image_ref)))
 
 
 def clean_html_text(text):
