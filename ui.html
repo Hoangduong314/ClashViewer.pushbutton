@@ -1,0 +1,377 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Clash Viewer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 15px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 8px 15px;
+            cursor: pointer;
+            background: #0e639c;
+            color: white;
+            border: 1px solid #1177bb;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        button:hover {
+            background: #1177bb;
+            border-color: #1177bb;
+        }
+
+        button.secondary {
+            background: #3a3d41;
+            color: #cccccc;
+            border: 1px solid #4a4d51;
+        }
+
+        button.secondary:hover {
+            background: #4a4d51;
+            border-color: #5a5d61;
+        }
+
+        .file-path {
+            font-style: italic;
+            color: #858585;
+            flex-grow: 1;
+            word-wrap: break-word;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 100px);
+        }
+
+        .table-container {
+            flex: 3;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+            overflow-y: auto;
+        }
+
+        .table-container::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .table-container::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .table-container::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #4f4f4f;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #3c3c3c;
+        }
+
+        th {
+            background: #2d2d2d;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            color: #cccccc;
+        }
+
+        tr {
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        tr:hover {
+            background: #2a2d2e;
+        }
+
+        tr.selected {
+            background: #094771;
+            color: #ffffff;
+        }
+
+        tr:active {
+            background: #094771;
+            color: #ffffff;
+        }
+
+        .preview-container {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .image-box {
+            flex-grow: 1;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+            background: #1e1e1e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .status-text {
+            color: #858585;
+        }
+
+        select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #3c3c3c;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+            background: #252526;
+            color: #d4d4d4;
+        }
+
+        select.status-new {
+            color: #fc7b7b;
+            font-weight: bold;
+            border-color: #fc7b7b;
+            background-color: #421b1b;
+        }
+
+        select.status-active {
+            color: #ffab91;
+            font-weight: bold;
+            border-color: #ffab91;
+            background-color: #42261b;
+        }
+
+        select.status-reviewed {
+            color: #ffd54f;
+            font-weight: bold;
+            border-color: #ffd54f;
+            background-color: #3b351d;
+        }
+
+        select.status-approved {
+            color: #81c784;
+            font-weight: bold;
+            border-color: #81c784;
+            background-color: #1e3b25;
+        }
+
+        select.status-resolved {
+            color: #64b5f6;
+            font-weight: bold;
+            border-color: #64b5f6;
+            background-color: #1e2b3b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <button onclick="sendToPython('select_file')">Open HTML Report</button>
+        <span id="lblFilePath" class="file-path">No file selected</span>
+        <button class="secondary" onclick="sendToPython('save_report')">Save Report</button>
+    </div>
+
+    <div class="main-content">
+        <div class="table-container">
+            <table id="clashTable">
+                <thead>
+                    <tr>
+                        <th>Clash Name</th>
+                        <th>Status</th>
+                        <th>Item ID</th>
+                        <th>Found Date</th>
+                    </tr>
+                </thead>
+                <tbody id="clashTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="preview-container">
+            <div class="image-box">
+                <span id="lblImgStatus" class="status-text">Select a clash to preview</span>
+                <img id="imgPreview" src="" style="display: none;" />
+            </div>
+            <button onclick="sendToPython('show_in_view')">Show in View (Selection Box)</button>
+        </div>
+    </div>
+
+    <script>
+        const STATUS_OPTIONS = ['New', 'Active', 'Reviewed', 'Approved', 'Resolved'];
+
+        function sendToPython(action, payload = {}) {
+            const message = Object.assign({ action }, payload);
+            if (window.chrome && window.chrome.webview) {
+                window.chrome.webview.postMessage(message);
+            } else {
+                console.log('Python bridge payload:', message);
+            }
+        }
+
+        function updateColor(selectElement) {
+            selectElement.className = selectElement.className.replace(/\bstatus-\w+\b/g, '').trim();
+            selectElement.classList.add('status-' + selectElement.value.toLowerCase());
+        }
+
+        function clearRowSelection() {
+            const tbody = document.getElementById('clashTableBody');
+            for (const row of tbody.rows) {
+                row.classList.remove('selected');
+            }
+        }
+
+        function selectClash(rowKey, selectedId, imagePath, rowElement) {
+            clearRowSelection();
+            if (rowElement) {
+                rowElement.classList.add('selected');
+            }
+
+            document.getElementById('lblImgStatus').innerText = 'Loading image...';
+            document.getElementById('lblImgStatus').style.display = 'block';
+            document.getElementById('imgPreview').style.display = 'none';
+
+            sendToPython('load_image', { image_path: imagePath });
+            sendToPython('row_selected', { row_key: rowKey, selected_id: selectedId });
+        }
+
+        function showBase64Image(base64Data) {
+            const img = document.getElementById('imgPreview');
+            if (base64Data) {
+                img.src = base64Data;
+                img.style.display = 'block';
+                document.getElementById('lblImgStatus').style.display = 'none';
+            } else {
+                img.style.display = 'none';
+                document.getElementById('lblImgStatus').innerText = 'Image not found or error loading!';
+                document.getElementById('lblImgStatus').style.display = 'block';
+            }
+        }
+
+        window.onload = function () {
+            sendToPython('ui_ready');
+        };
+
+        function selectClashByRowKey(rowKey) {
+            const tbody = document.getElementById('clashTableBody');
+            for (const row of tbody.rows) {
+                if (row.dataset.rowKey === rowKey) {
+                    row.click();
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
+            }
+        }
+
+        function updateFilePath(path) {
+            document.getElementById('lblFilePath').innerText = path || 'No file selected';
+        }
+
+        function createStatusSelect(item) {
+            const select = document.createElement('select');
+            select.classList.add('status-' + String(item.status || '').toLowerCase());
+
+            STATUS_OPTIONS.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status;
+                option.textContent = status;
+                option.selected = item.status === status;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+
+            select.addEventListener('change', function (event) {
+                updateColor(event.target);
+                sendToPython('update_status', {
+                    row_key: item.rowKey,
+                    status: event.target.value
+                });
+            });
+
+            return select;
+        }
+
+        function appendTextCell(row, value) {
+            const td = document.createElement('td');
+            td.textContent = value || '';
+            row.appendChild(td);
+        }
+
+        function loadClashData(data) {
+            const rows = Array.isArray(data) ? data : JSON.parse(data || '[]');
+            const tbody = document.getElementById('clashTableBody');
+            tbody.innerHTML = '';
+            clearRowSelection();
+
+            rows.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.dataset.rowKey = item.rowKey || '';
+                tr.dataset.displayId = item.displayId || '';
+
+                tr.addEventListener('click', function (event) {
+                    if (event.target.tagName === 'SELECT') {
+                        return;
+                    }
+                    selectClash(item.rowKey, item.displayId, item.imagePath, tr);
+                });
+
+                appendTextCell(tr, item.name);
+
+                const statusTd = document.createElement('td');
+                statusTd.appendChild(createStatusSelect(item));
+                tr.appendChild(statusTd);
+
+                appendTextCell(tr, item.displayId);
+                appendTextCell(tr, item.date);
+
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+
+</html>
